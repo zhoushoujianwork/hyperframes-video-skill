@@ -1,0 +1,12 @@
+.DS_Store
+node_modules/
+*.log
+# 不入库渲染产物/素材缓存
+*.mp4
+*.mov
+assets/*.mp3
+assets/*.srt
+preview-frames/
+snapshots/
+.cache/
+.agents/
