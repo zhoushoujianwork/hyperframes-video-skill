@@ -13,7 +13,14 @@ SKILL="bilibili-product-video"
 CLAUDE="$HOME/.claude/skills"
 CODEX="$HOME/.codex/skills"
 
-backup() { [ -e "$1" ] && [ ! -L "$1" ] && mv "$1" "$1.bak.$(date +%s 2>/dev/null || echo old)" && echo "  备份旧目录 -> $1.bak.*"; }
+# 备份到 skills 目录【外面】，否则 .bak 会被当成重复 skill 加载。
+BAKDIR="$HOME/.skill-backups"
+backup() {
+  [ -e "$1" ] && [ ! -L "$1" ] || return 0
+  mkdir -p "$BAKDIR"
+  local dest="$BAKDIR/$(basename "$1").$(date +%s 2>/dev/null || echo old)"
+  mv "$1" "$dest" && echo "  备份旧目录 -> $dest"
+}
 
 # 选主目录：claude 优先；claude 不存在则用 codex
 if [ -d "$HOME/.claude" ] || [ ! -d "$HOME/.codex" ]; then
