@@ -283,6 +283,22 @@ B站投稿页（chrome-devtools）已踩过的坑：
 - **残留分P名**：单 P 投稿时左侧卡片可能残留旧标题，但**公开标题以「标题」输入框为准**，卡片名不对外、且只读不可编辑——核对输入框即可，别纠结卡片。
 - **发布后核对**：去 `upload-manager/article` 确认公开标题/封面/合集都落对。
 
+#### CLI 快传（可选；⚠ B站当前封禁第三方提交，最终仍回退浏览器）
+
+`scripts/bili-upload.sh` 包了 [`bilitool`](https://github.com/timerring/bilitool)（维护中的 B站投稿 CLI）：
+
+```bash
+BILIUP_COOKIE=/path/to/cookies.json \
+  bash "$SKILL_DIR/scripts/bili-upload.sh" \
+  videos/<ep>/renders/<full>.mp4 videos/_cover-<ep>/cover.png \
+  "<标题>" 174 "开源硬件,ESP32,嵌入式,..." videos/<ep>/desc.txt
+```
+
+- **现状（实测 2026-06，重要）**：biliup / bilitool **都能把视频字节+封面成功传上 B站**，但最后「创建稿件」被 B站拒——`biliup: 21150 投稿入口升级中` / `bilitool: 投稿工具已停用`。换第三方工具同样被拦，这是 B站策略不是工具 bug。**所以最终投稿务必走上面的浏览器创作中心**；本脚本用于快速校验登录/上传链路，及 B站若恢复接口即可直接用。脚本检测到拦截会自动提示回退浏览器并退出码 2。
+- **登录免扫码（cookie 复用）**：`biliup login` 生成的 `cookies.json`（顶层 `cookie_info` + `token_info.access_token`）可转成 bilitool 的 `-f` 格式（`{"data":{"access_token":..., "cookie_info":...}}`，cookie 顺序须 SESSDATA/bili_jct/DedeUserID/__ckMd5/sid）——脚本里已内置转换，设 `BILIUP_COOKIE` 即自动登录。
+- **file_upload 工具传不了本地成片**：只接受「对话附件」，仓库路径一律被拒；桌面控制对浏览器是只读等级、点不了原生文件框。所以浏览器投稿时**视频/封面那一下需用户手动拖拽**，其余元数据再交给浏览器自动填。
+- 不要提交 `cookies.json` / bilitool 登录态到仓库（含账号凭据）。
+
 ### 8. Collection Management
 
 If the user asks for a collection, create or reuse:
