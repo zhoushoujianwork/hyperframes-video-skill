@@ -183,6 +183,20 @@ npx hyperframes inspect
 npx hyperframes render
 ```
 
+**片头/片尾拼接 + 配音合成（音频管线，已踩坑）**：
+
+- **配音合进正片**：`ffmpeg -i video.mp4 -i voice.mp3 -c:v copy -c:a aac -ar 44100 -ac 1 -map 0:v:0 -map 1:a:0 out.mp4`。配音用 `scripts/voice.sh`（默认 44100Hz，见下）。
+- **拼接 intro+正片+outro：三段音频必须同采样率、零重采样**，否则会出**杂音**。最稳：配音出成 44.1kHz/单声道（`voice.sh` 已默认 `VOICE_SAMPLE_RATE=44100`；MiniMax 支持 44100、**不支持 48000**），片头/片尾的静音轨也用 44.1kHz/单声道，concat 不加任何 `aformat/aresample` 升采样：
+
+  ```bash
+  ffmpeg -y -i intro.mp4 -i ep-voiced.mp4 -i outro.mp4 \
+    -f lavfi -i anullsrc=channel_layout=mono:sample_rate=44100 \
+    -filter_complex "[0:v]scale=1920:1080,fps=30,setsar=1[v0];[1:v]scale=1920:1080,fps=30,setsar=1[v1];[2:v]scale=1920:1080,fps=30,setsar=1[v2];[3:a]asplit=2[sa][sc];[sa]atrim=0:<intro_dur>,asetpts=N/SR/TB[a0];[1:a]asetpts=N/SR/TB[a1];[sc]atrim=0:<outro_dur>,asetpts=N/SR/TB[a2];[v0][a0][v1][a1][v2][a2]concat=n=3:v=1:a=1[v][a]" \
+    -map "[v]" -map "[a]" -c:v libx264 -crf 19 -pix_fmt yuv420p -c:a aac -ar 44100 -ac 1 "$OUT"
+  ```
+  自检：`ffmpeg -i out.mp4 -af volumedetect -f null -` 的 `max_volume` 不应是 0.0dB（削峰=杂音线索）。
+- **重出 TTS 时长会变**（MMX 节奏有随机性，同文本同语速也可能差 1s）——重出后必须按新音频重新对齐场景时间轴并改 `data-duration`，否则结尾被切。
+
 If a command differs for the local project, follow the local HyperFrames files and CLI help.
 
 #### 动画工具箱（2026-06 升级 — 把"形象动画"做到爱上半导体那一档）
