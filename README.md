@@ -37,11 +37,31 @@ curl -fsSL https://raw.githubusercontent.com/zhoushoujianwork/hyperframes-video-
 
 ## 配音（音色克隆 / 回退）
 
+合成配音：
+
 ```bash
 bash scripts/voice.sh narration.txt assets/voice.mp3
 ```
 
 环境变量：`MMX_VOICE_ID`（设了才用克隆声）、`VOICE_EMOTION`(默认 happy)、`VOICE_SPEED`(默认 1.12)。
+
+### 想用自己的声音？先初始化一次音色（可选）
+
+声音走 `MMX_VOICE_ID`。装了 `mmx` 的话，克隆脚本**默认复用 `~/.mmx/config.json` 的凭据**，不用再单独配 key。只支持 MiniMax（豆包不做，要单独开权限）。
+
+```bash
+# 1) 先看账号里有没有现成的克隆音色，有就直接复用
+bash scripts/voice-clone.sh list
+export MMX_VOICE_ID=<上面某个 voice_id>
+
+# 2) 没有现成的，才克隆一个（录一段 10s–5min 干净人声：mp3/m4a/wav）
+bash scripts/voice-clone.sh my-voice.mp3
+export MMX_VOICE_ID=<打印出来的 voice_id>
+```
+
+把 `export MMX_VOICE_ID=...` 写进 `~/.zshrc` 即长期复用。**没装 mmx / 不想克隆** → 跳过本节，配音自动回退系统 TTS。完整说明见 [`references/voice-clone.md`](references/voice-clone.md)。
+
+> 产物落 `~/Downloads/hf-video/<项目名>/<episode>/`，不写进你的项目仓库。
 
 ## 用法
 
