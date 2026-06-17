@@ -94,24 +94,42 @@ For Agent Room-like projects, frame it as:
 - Multiple AI agents can enter a room and talk through a problem like a meeting or voice room.
 - The hook is practical: "同事电脑没 AI，也能让我的 AI 帮他排查问题".
 
-### 2. Create A Video Folder
+### 2. Create A Video Folder（产物一律落下载目录，**别拉进目标仓库**）
 
-Create a dedicated folder under `videos/`:
+**铁律**：动画工程、成片、配音、抽帧、封面等**所有产物和中间文件**都放到统一的下载目录，**绝不在目标项目仓库里建 `videos/` 或散落 `.mp4`/`.mp3`**——避免把目标仓库搞脏。
+
+约定根目录：
 
 ```text
-videos/episode-NN-topic-bilibili/
-├── assets/
-├── preview-frames/
+~/Downloads/hf-video/<项目名>/<episode>/
+```
+
+- `<项目名>` = 目标项目目录名（运行 skill 时当前仓库的 basename，例如 `agent_room`）。
+- `<episode>` = `episode-NN-topic`。
+- 进 skill 后先固定一个变量，后续所有路径都基于它：
+
+  ```bash
+  PROJECT="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
+  EP_DIR="$HOME/Downloads/hf-video/$PROJECT/episode-NN-topic"
+  mkdir -p "$EP_DIR"/{assets,preview-frames,renders}
+  ```
+
+目录结构：
+
+```text
+~/Downloads/hf-video/<项目名>/episode-NN-topic/
+├── assets/            # mikas-voice.mp3 / .srt 等配音产物
+├── preview-frames/    # snapshot 抽帧
+├── renders/           # 渲染成片 *.mp4（含拼好片头片尾的 full）
 ├── design.md
 ├── narration.md
 ├── narration.txt
-├── index.html
+├── index.html         # HyperFrames 工程
 ├── publish-draft.md
-├── cover-*.png
-└── *.mp4
+└── cover-*.png
 ```
 
-Keep generated assets scoped to this folder. Do not disturb unrelated user changes in the repo.
+把生成的素材全部限定在 `$EP_DIR` 内。**不要**在目标仓库里写任何视频产物，也不要改动目标仓库无关文件。投稿那一步若浏览器/CLI 要求路径在工作区内，再从 `$EP_DIR` **拷贝**一份过去，别反过来把产物生在仓库里。
 
 ### 3. Write The Script
 
@@ -140,6 +158,18 @@ Keep generated assets scoped to this folder. Do not disturb unrelated user chang
 它支持六个 AI 后端。它可以热切换。它的驱动层负责适配。它还能本地离线。
 ```
 
+### 4.0 克隆你的音色（可选；先拿到 `MMX_VOICE_ID`）
+
+用户想用**自己的声音**配音时，先拿到一个 `voice_id`。**先列已有的复用，别重复克隆**：
+
+```bash
+bash "$SKILL_DIR/scripts/voice-clone.sh" list          # 列出账号已克隆的音色
+export MMX_VOICE_ID=<上面某个 voice_id>                  # 复用现成的
+# 没有现成的才克隆：bash "$SKILL_DIR/scripts/voice-clone.sh" <样本.mp3>
+```
+
+只支持 MiniMax（豆包不做，要单独开权限）；脚本默认复用 mmx 的凭据。**完整说明、环境变量、样本要求、故障排查见 [`references/voice-clone.md`](references/voice-clone.md)**。没配 / 不想克隆 → 跳过，§4 自动回退系统 TTS。
+
 ### 4. Generate Voiceover（音色克隆，带回退）
 
 统一用本仓库的 `scripts/voice.sh` 生成配音——它会**自动探测**：
@@ -151,7 +181,7 @@ bash "$SKILL_DIR/scripts/voice.sh" narration.txt assets/mikas-voice.mp3
 - **配了 MMX/MiniMax**（`mmx` 在 PATH 且设了 `MMX_VOICE_ID`）→ 用**克隆声**：
   `mmx speech synthesize --voice "$MMX_VOICE_ID" --emotion happy --speed 1.12 --subtitles --language Chinese --out <out>`
 - **没配** → **回退系统 TTS**：macOS `say` / Linux `espeak`(-ng)，转成 mp3。保证任何人 clone 下来都能出片。
-- 可选环境变量：`MMX_VOICE_ID`（克隆声 ID）、`VOICE_EMOTION`（默认 happy）、`VOICE_SPEED`（默认 1.12）。
+- 可选环境变量：`MMX_VOICE_ID`（克隆声 ID，**没有就先按 §4.0 克隆一次**）、`VOICE_EMOTION`（默认 happy）、`VOICE_SPEED`（默认 1.12）。
 
 产物：`assets/<name>.mp3` + `assets/<name>.srt`（MMX 带 `--subtitles`；回退路径用 `hyperframes transcribe` 或按句估时生成 SRT）。
 
@@ -304,8 +334,8 @@ B站投稿页（chrome-devtools）已踩过的坑：
 ```bash
 BILIUP_COOKIE=/path/to/cookies.json \
   bash "$SKILL_DIR/scripts/bili-upload.sh" \
-  videos/<ep>/renders/<full>.mp4 videos/_cover-<ep>/cover.png \
-  "<标题>" 174 "开源硬件,ESP32,嵌入式,..." videos/<ep>/desc.txt
+  "$EP_DIR/renders/<full>.mp4" "$EP_DIR/cover-16x9.png" \
+  "<标题>" 174 "开源硬件,ESP32,嵌入式,..." "$EP_DIR/desc.txt"
 ```
 
 - **现状（实测 2026-06，重要）**：biliup / bilitool **都能把视频字节+封面成功传上 B站**，但最后「创建稿件」被 B站拒——`biliup: 21150 投稿入口升级中` / `bilitool: 投稿工具已停用`。换第三方工具同样被拦，这是 B站策略不是工具 bug。**所以最终投稿务必走上面的浏览器创作中心**；本脚本用于快速校验登录/上传链路，及 B站若恢复接口即可直接用。脚本检测到拦截会自动提示回退浏览器并退出码 2。
