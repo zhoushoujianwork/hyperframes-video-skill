@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# pre-commit — 开源仓库敏感内容拦截。命中即阻止提交（见 CLAUDE.md）。
+#
+# 启用（克隆后跑一次，或由 install.sh 自动设）：
+#   git config core.hooksPath .githooks
+#
+# 只扫**本次新增的行**（git diff --cached 的 + 行），避免误伤历史/文档字段名。
+# 确属误报时，可在该行尾加注释  # nosecret  跳过，或用  git commit --no-verify。
+set -euo pipefail
+
+fail=0
+note() { echo "✖ [pre-commit] $1" >&2; fail=1; }
+
+# 暂存的新增行（去掉 +++ 头；去掉带 nosecret 豁免的行）
+added="$(git diff --cached -U0 --no-color | grep -E '^\+' | grep -vE '^\+\+\+' | grep -vE '#[[:space:]]*nosecret' || true)"
+
+# 1) 真实密钥：sk-xxx- 后接一长串真值（占位符 sk-cp-… 不会命中）
+echo "$added" | grep -nE 'sk-[a-z]+-[A-Za-z0-9_-]{20,}' >/dev/null \
+  && note "疑似 API key（sk-...）。凭据不入库，运行时读环境变量/~/.mmx。"
+
+# 2) 真实 cookie/token 值（要求紧跟一段真值；字段名说明不会命中）
+echo "$added" | grep -nE '(SESSDATA|bili_jct|DedeUserID)=[%A-Za-z0-9]{6,}' >/dev/null \
+  && note "疑似 B站 cookie 真值（SESSDATA/bili_jct 等）。"
+echo "$added" | grep -nE '"access_token"[[:space:]]*:[[:space:]]*"[A-Za-z0-9._-]{15,}"' >/dev/null \
+  && note "疑似 access_token 真值。"
+
+# 3) 本机绝对路径（用 \$HOME/\$SKILL_DIR/相对路径代替；<name> 占位不会命中）
+echo "$added" | grep -nE '/Users/[a-z][a-z0-9_-]+/' >/dev/null \
+  && note "本机绝对路径 /Users/<真实名>/。改用 \$HOME / \$SKILL_DIR / 相对路径。"
+
+# 4) 不该入库的文件类型 / 凭据文件
+bad_files="$(git diff --cached --name-only --diff-filter=AM \
+  | grep -iE '\.(mp4|mov|mp3|srt)$|(^|/)cookies\.json$' || true)"
+[ -n "$bad_files" ] && note "暂存了产物/凭据文件：$(echo "$bad_files" | tr '\n' ' ')（应落 ~/Downloads，或加 .gitignore）"
+
+if [ "$fail" = 1 ]; then
+  echo "" >&2
+  echo "[pre-commit] 提交被拦截。确认无误后可 'git commit --no-verify' 跳过，或行尾加 # nosecret。" >&2
+  exit 1
+fi
+exit 0

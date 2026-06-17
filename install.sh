@@ -40,6 +40,10 @@ else
   git clone --depth=1 "$REPO" "$PRIMARY"
 fi
 
+# 启用版本化 git hooks（开源提交前敏感内容拦截，见 .githooks/pre-commit）
+git -C "$PRIMARY" config core.hooksPath .githooks 2>/dev/null \
+  && echo "  已启用 pre-commit 敏感内容拦截（core.hooksPath=.githooks）"
+
 # 另一端：symlink 指向主克隆（拉一次两端同步）
 if [ -d "$(dirname "$OTHER_ROOT")" ] || [ -d "$OTHER_ROOT" ]; then
   mkdir -p "$OTHER_ROOT"
